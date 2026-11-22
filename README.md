@@ -74,6 +74,9 @@ while True:
 
 Pic of the console location here:
 
+![console pads](console_pads.jpg)
+
+Left to right its GND, RX, TX and its baud rate 115200.
 
 I bashed at the console for a long time. In setup mode you get a command line, where you can run stuff like `ls`, `cat` etc.
 You'd get things like the following:
