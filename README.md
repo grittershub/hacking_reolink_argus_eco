@@ -1,5 +1,21 @@
 # Hacking the ReoLink Argus Eco camera
 
+## TL;DR
+
+UID is generally required to acess this camera. It is normally in a QR code on the body and also exists hard coded into your camera firmware. If that UID is missing, it can be recovered in the following way:
+
+- Press factory reset
+
+- Display QR code in ISO-8859-1 encoding with the following text to your camera:
+
+```
+<QR><S>ssid</S><P>password</P></QR>
+```
+
+- Camera will connect to your wifi, no UID required. Camera can now be discovered on your LAN through the app, the UID will display on the app when discovered.
+
+## Writeup
+
 I had an Argus Eco camera from 2020. It had fallen down and stopped charging via the solar panel.
 
 When I brought it back inside it wouldn't connect to the network, so I did what anyone would do and factory reset it. 
@@ -14,11 +30,11 @@ Following the bouncing ball on the app, it asked to find it on the network. It w
 
 Most were network related, but one had UID.
 
-UID was now missing from the app, so I had a look on the camera body. The sticker had completely faded in the sun and it turns out that's what the UID is.
+UID was now missing from the app, so I had a look on the camera body. The sticker had completely faded in the sun and it turns out that's where the UID is.
 
 I remembered the camera used to go into a setup mode where you could show it a QR code but I couldn't find out where the QR code would come from in the app.
 
-Turns out, it will show you the QR code, if you give it the UID.
+Turns out, the app will show you the QR code, if you give it the UID.
 
 Hunting online I found someone had already described what the format of the QR code had to be.
 
@@ -27,7 +43,9 @@ Hunting online I found someone had already described what the format of the QR c
 ```
 
 if you encode that in ISO-8859-1 using something like https://qr.pratt.edu/index.php the camera will detect it and jump onto your network.
+
 Except for the fact I had no UID.
+
 So I did what anyone would do and tried 0000, 1234 etc. It would tell me it was invalid every time.
 
 Ok now we dismantle the camera and look for the UID somewhere. It's not printed on the board, nor are any of the stickers related to a UID.
@@ -145,4 +163,26 @@ sar_adc_init
 
 Making a new QR code with the same format, subbing in my last 4 chars of the UID, and my correct wifi details, worked first time and I was back in!
 
-Next step is dumping the firmware, because stuffed if I'm letting someone else with the same worn off sticker problem and a lack of circuit board probe kit have a useless camera.
+## Camera internal details
+
+Firmware chip: GigaDevice GD25Q127CSIG - this is a 25 series chip that can be read with a CH341A reader.
+SOC: GM8136 
+
+## Firmware dump
+
+Regardless, I didn't want someone with the same problem to have to dismantle their camera and attach probes to the mainboard console. So I decided to take the firmware out and look for the inevitable backdoor or bug.
+
+Firmware for this camera can be dumped with a standard CH341A. Detach the power, attach the probe clip. Make sure you've aligned pin1 all the way from the camera right down to the reader, this may depend on your clip wiring and your reader wiring.
+
+I dumped the firmware with etch341. You can see your UID in plaintext via strings, but the code is available also. Code is ARM v5t, Little Endian, 32bit. I used dd to split out the firmware into blobs then Ghidra to analyse.
+
+Reversing the code found that omitting the <C> field in the XML will bypass any UID check. Shoulda tried this earlier to be honest, but 20/20 hindsight.
+
+This means that a QR code like
+```
+<QR><S>ssid</S><P>password</P></QR>
+```
+
+will get the camera straight onto the network, no UID required.
+
+
